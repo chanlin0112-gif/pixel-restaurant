@@ -6,6 +6,7 @@ export const state = {
   coins: 12000,
   popularity: 0,
   isOpen: false,
+  servedTotal: 0,
   // 餐廳裡的家具（type 種類、col/row 位置、rot 方向 0～3）
   furniture: [
     { id: 1, type: 'stove', col: 0, row: 0, rot: 0 },
