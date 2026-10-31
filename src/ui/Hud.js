@@ -1,15 +1,18 @@
 import { state, updateState, onStateChange } from '../state/gameState.js';
+import { emit } from '../state/events.js';
+import { FURNITURE, SHOP_ORDER } from '../data/furniture.js';
 
 // 下方功能列
 const TABS = [
   { id: 'restaurant', icon: '🏠', label: '餐廳', ready: true },
   { id: 'menu', icon: '📋', label: '菜單', ready: false, desc: '設定要賣的料理和價格。' },
   { id: 'staff', icon: '🧑‍🍳', label: '員工', ready: false, desc: '招募廚師和服務生，讓出餐更快。' },
-  { id: 'decor', icon: '🪑', label: '裝潢', ready: false, desc: '購買桌椅、廚房設備和裝飾，下一關就會開放！' },
+  { id: 'decor', icon: '🪑', label: '裝潢', ready: true },
   { id: 'stats', icon: '📊', label: '統計', ready: false, desc: '查看每天的收入、來客數和人氣變化。' }
 ];
 
 let refs = {};
+let toastTimer = null;
 
 export function createHud() {
   const root = document.createElement('div');
@@ -22,6 +25,11 @@ export function createHud() {
       <button class="hud-chip hud-open" id="hud-open"></button>
       <button class="hud-chip hud-icon-btn" id="hud-settings" aria-label="設定">⚙️</button>
     </header>
+    <div class="hud-toast" id="hud-toast"></div>
+    <div class="hud-actions" id="hud-actions" hidden>
+      <div class="hud-actions-title" id="hud-actions-title"></div>
+      <div class="hud-actions-btns" id="hud-actions-btns"></div>
+    </div>
     <nav class="hud-nav" id="hud-nav"></nav>
     <div class="hud-panel" id="hud-panel" hidden>
       <div class="hud-panel-box">
@@ -39,6 +47,10 @@ export function createHud() {
     coins: root.querySelector('#hud-coins'),
     pop: root.querySelector('#hud-pop'),
     open: root.querySelector('#hud-open'),
+    toast: root.querySelector('#hud-toast'),
+    actions: root.querySelector('#hud-actions'),
+    actionsTitle: root.querySelector('#hud-actions-title'),
+    actionsBtns: root.querySelector('#hud-actions-btns'),
     nav: root.querySelector('#hud-nav'),
     panel: root.querySelector('#hud-panel'),
     panelTitle: root.querySelector('#hud-panel-title'),
@@ -48,6 +60,33 @@ export function createHud() {
   buildNav();
   bindEvents(root);
   onStateChange(render);
+}
+
+// 顯示提示訊息（ms 設 0 代表不會自動消失）
+export function showMessage(text, ms = 2500) {
+  refs.toast.textContent = text;
+  refs.toast.classList.add('show');
+  clearTimeout(toastTimer);
+  if (ms > 0) toastTimer = setTimeout(() => refs.toast.classList.remove('show'), ms);
+}
+
+// 顯示家具操作按鈕
+export function showActions(title, buttons) {
+  refs.actionsTitle.textContent = title;
+  refs.actionsBtns.innerHTML = '';
+  buttons.forEach((b) => {
+    const btn = document.createElement('button');
+    btn.className = 'hud-btn' + (b.style ? ' ' + b.style : '');
+    btn.textContent = b.label;
+    if (b.disabled) btn.disabled = true;
+    btn.addEventListener('click', b.onClick);
+    refs.actionsBtns.appendChild(btn);
+  });
+  refs.actions.hidden = false;
+}
+
+export function hideActions() {
+  refs.actions.hidden = true;
 }
 
 function buildNav() {
@@ -87,13 +126,40 @@ function setActive(id) {
 }
 
 function selectTab(tab) {
-  if (tab.ready) {
+  if (tab.id === 'restaurant') {
     closePanel();
     return;
   }
   setActive(tab.id);
+  if (tab.id === 'decor') {
+    openShop();
+    return;
+  }
   openPanel(`${tab.icon} ${tab.label}`,
     `<p class="hud-soon-big">即將開放</p><p>${tab.desc}</p>`);
+}
+
+function openShop() {
+  const rows = SHOP_ORDER.map((id) => {
+    const f = FURNITURE[id];
+    const canBuy = state.coins >= f.price;
+    return `
+      <div class="shop-item">
+        <div class="shop-icon">${f.icon}</div>
+        <div class="shop-info">
+          <div class="shop-name">${f.name}</div>
+          <div class="shop-desc">${f.desc}</div>
+        </div>
+        <button class="hud-btn primary" data-buy="${id}" ${canBuy ? '' : 'disabled'}>🪙 ${f.price.toLocaleString('zh-TW')}</button>
+      </div>`;
+  }).join('');
+  openPanel('🪑 裝潢商店', `<div class="shop-list">${rows}</div>`);
+  refs.panelBody.querySelectorAll('[data-buy]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      closePanel();
+      emit('buy', btn.dataset.buy);
+    });
+  });
 }
 
 function openPanel(title, html) {
@@ -109,9 +175,9 @@ function closePanel() {
 
 function openSettings() {
   openPanel('⚙️ 設定', `
-    <p><b>手機操作</b><br>單指拖曳：移動畫面<br>雙指縮放：放大／縮小<br>點一下：選取格子</p>
-    <p><b>電腦操作</b><br>滑鼠拖曳：移動畫面<br>滾輪：放大／縮小<br>WASD／方向鍵：移動畫面<br>數字鍵 1～5：切換功能列<br>Esc：關閉視窗</p>
-    <p style="opacity:0.6">遊戲版本 0.2.0</p>`);
+    <p><b>手機操作</b><br>單指拖曳：移動畫面<br>雙指縮放：放大／縮小<br>點家具：旋轉、移動、拆除<br>長按家具：直接拖曳移動</p>
+    <p><b>電腦操作</b><br>滑鼠拖曳：移動畫面<br>滾輪：放大／縮小<br>WASD／方向鍵：移動畫面<br>R：旋轉　Enter：確定　Delete：拆除<br>數字鍵 1～5：切換功能列　Esc：取消</p>
+    <p style="opacity:0.6">遊戲版本 0.3.0</p>`);
 }
 
 function render(s) {
@@ -120,9 +186,4 @@ function render(s) {
   refs.pop.textContent = s.popularity;
   refs.open.textContent = s.isOpen ? '營業中' : '休息中';
   refs.open.classList.toggle('is-open', s.isOpen);
-}
-
-function showMessage(text) {
-  const el = document.getElementById('hud-info');
-  if (el) el.textContent = text;
 }
