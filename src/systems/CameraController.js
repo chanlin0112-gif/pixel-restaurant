@@ -1,4 +1,4 @@
-// 視角操作：拖曳、雙指縮放、滾輪、WASD／方向鍵
+// 視角操作：拖曳、雙指縮放、滾輪、WASD／方向鍵，以及長按拖曳家具
 export class CameraController {
   constructor(scene, center, mapW, mapH) {
     this.scene = scene;
@@ -6,11 +6,17 @@ export class CameraController {
     this.minZoom = 0.4;
     this.maxZoom = 3;
     this.onTap = null;
+    this.onPress = null;
+    this.onLongPress = null;
+    this.onDragMove = null;
+    this.onDragEnd = null;
     this.last = null;
     this.downPos = null;
     this.moved = false;
     this.pinchDist = 0;
     this.wasPinching = false;
+    this.capturing = false;
+    this.pressTimer = null;
 
     this.cam.centerOn(center.x, center.y);
     const fit = Math.min(this.cam.width / (mapW + 40), this.cam.height / (mapH + 160));
@@ -38,6 +44,14 @@ export class CameraController {
     return [inp.pointer1, inp.pointer2].filter((p) => p && p.isDown);
   }
 
+  stopCapture() {
+    clearTimeout(this.pressTimer);
+    if (this.capturing) {
+      this.capturing = false;
+      if (this.onDragEnd) this.onDragEnd();
+    }
+  }
+
   handleDown(p) {
     this.downPos = { x: p.x, y: p.y };
     this.last = { x: p.x, y: p.y };
@@ -46,6 +60,23 @@ export class CameraController {
     if (t.length >= 2) {
       this.wasPinching = true;
       this.pinchDist = Math.hypot(t[0].x - t[1].x, t[0].y - t[1].y);
+      this.stopCapture();
+      return;
+    }
+    const wp = this.cam.getWorldPoint(p.x, p.y);
+    if (this.onPress && this.onPress(wp.x, wp.y)) {
+      this.capturing = true;
+      return;
+    }
+    clearTimeout(this.pressTimer);
+    if (this.onLongPress) {
+      this.pressTimer = setTimeout(() => {
+        if (this.moved || this.wasPinching || !this.downPos) return;
+        if (this.onLongPress(wp.x, wp.y)) {
+          this.capturing = true;
+          if (navigator.vibrate) navigator.vibrate(20);
+        }
+      }, 450);
     }
   }
 
@@ -60,8 +91,14 @@ export class CameraController {
       return;
     }
     if (this.wasPinching) return;
-    if (Math.hypot(p.x - this.downPos.x, p.y - this.downPos.y) > 8) this.moved = true;
-    if (this.moved) {
+    if (Math.hypot(p.x - this.downPos.x, p.y - this.downPos.y) > 8) {
+      this.moved = true;
+      clearTimeout(this.pressTimer);
+    }
+    if (this.capturing) {
+      const wp = this.cam.getWorldPoint(p.x, p.y);
+      if (this.onDragMove) this.onDragMove(wp.x, wp.y);
+    } else if (this.moved) {
       this.cam.scrollX -= (p.x - this.last.x) / this.cam.zoom;
       this.cam.scrollY -= (p.y - this.last.y) / this.cam.zoom;
     }
@@ -69,7 +106,10 @@ export class CameraController {
   }
 
   handleUp(p) {
-    if (!this.moved && !this.wasPinching && this.downPos && this.onTap) {
+    clearTimeout(this.pressTimer);
+    const wasCapturing = this.capturing;
+    this.stopCapture();
+    if (!wasCapturing && !this.moved && !this.wasPinching && this.downPos && this.onTap) {
       const wp = this.cam.getWorldPoint(p.x, p.y);
       this.onTap(wp.x, wp.y);
     }
