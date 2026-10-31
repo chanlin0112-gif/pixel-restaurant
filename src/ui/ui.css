@@ -1,0 +1,100 @@
+#hud {
+  position: fixed; inset: 0; pointer-events: none; z-index: 20;
+  font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+  --brown: #5a3e2b; --cream: #fff8ee; --tan: #e9d3b5; --accent: #e8a35c; --green: #6aa84f;
+  -webkit-user-select: none; user-select: none;
+}
+#hud button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+/* 上方資訊列 */
+.hud-top {
+  position: absolute; display: flex; gap: 6px; justify-content: center;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  left: calc(env(safe-area-inset-left, 0px) + 8px);
+  right: calc(env(safe-area-inset-right, 0px) + 8px);
+}
+.hud-chip {
+  pointer-events: auto; display: flex; align-items: center; gap: 4px;
+  min-height: 40px; padding: 0 10px; box-sizing: border-box;
+  background: var(--cream); color: var(--brown);
+  border: 3px solid var(--brown); border-radius: 8px;
+  box-shadow: 0 3px 0 var(--brown); font-size: 15px; white-space: nowrap;
+}
+.hud-open { background: #d9cbb8; font-weight: bold; }
+.hud-open.is-open { background: var(--green); color: #fff; }
+.hud-icon-btn { padding: 0 8px; }
+.hud-chip:active, .hud-tab:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--brown); }
+
+/* 下方功能列 */
+.hud-nav {
+  pointer-events: auto; position: absolute; box-sizing: border-box;
+  left: 50%; transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+  width: min(calc(100% - 16px), 560px);
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 6px;
+  background: var(--brown); border-radius: 12px;
+}
+.hud-tab {
+  position: relative; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px; min-height: 56px;
+  background: var(--tan); color: var(--brown); border: none; border-radius: 8px;
+  box-shadow: 0 3px 0 #3d2a1d; font-size: 13px;
+}
+.hud-tab.active { background: var(--accent); color: #fff; }
+.hud-tab-icon { font-size: 20px; line-height: 1; }
+.hud-soon {
+  position: absolute; top: -6px; right: -2px; font-style: normal; font-size: 9px;
+  background: #c9714b; color: #fff; padding: 1px 4px; border-radius: 4px;
+}
+
+/* 彈出視窗 */
+.hud-panel {
+  pointer-events: auto; position: absolute; inset: 0; box-sizing: border-box;
+  background: rgba(40, 28, 20, 0.45); padding: 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+.hud-panel[hidden] { display: none; }
+.hud-panel-box {
+  width: min(100%, 420px); max-height: 80%; overflow: auto;
+  background: var(--cream); color: var(--brown);
+  border: 4px solid var(--brown); border-radius: 12px; box-shadow: 0 6px 0 var(--brown);
+}
+.hud-panel-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px; background: var(--tan); border-bottom: 3px solid var(--brown);
+}
+.hud-panel-head h2 { margin: 0; font-size: 18px; }
+.hud-close {
+  width: 40px; height: 40px; border: 3px solid var(--brown); border-radius: 8px;
+  background: var(--cream); color: var(--brown); font-size: 18px;
+}
+.hud-panel-body { padding: 14px 16px; font-size: 15px; line-height: 1.6; }
+.hud-soon-big {
+  display: inline-block; margin: 0 0 8px; padding: 4px 10px;
+  background: #c9714b; color: #fff; border-radius: 6px; font-weight: bold;
+}
+
+/* 點格子的提示，移到資訊列下面 */
+#hud-info { top: calc(env(safe-area-inset-top, 0px) + 64px) !important; z-index: 15 !important; }
+
+/* 手機橫向：功能列改到右側 */
+@media (max-height: 500px) and (orientation: landscape) {
+  .hud-top { top: calc(env(safe-area-inset-top, 0px) + 6px); }
+  .hud-chip { min-height: 34px; font-size: 14px; }
+  .hud-nav {
+    left: auto; transform: none; width: 76px;
+    right: calc(env(safe-area-inset-right, 0px) + 8px);
+    top: 52px; bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+    grid-template-columns: 1fr;
+  }
+  .hud-tab { min-height: 0; font-size: 12px; }
+  .hud-tab-icon { font-size: 18px; }
+  #hud-info { top: calc(env(safe-area-inset-top, 0px) + 52px) !important; }
+}
+
+/* 電腦、平板等大螢幕 */
+@media (min-width: 900px) and (min-height: 600px) {
+  .hud-chip { min-height: 44px; font-size: 17px; padding: 0 14px; }
+  .hud-tab { min-height: 64px; font-size: 15px; }
+  .hud-tab-icon { font-size: 24px; }
+}
