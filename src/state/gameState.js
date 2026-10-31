@@ -5,7 +5,16 @@ export const state = {
   level: 1,
   coins: 12000,
   popularity: 0,
-  isOpen: false
+  isOpen: false,
+  // 餐廳裡的家具（type 種類、col/row 位置、rot 方向 0～3）
+  furniture: [
+    { id: 1, type: 'stove', col: 0, row: 0, rot: 0 },
+    { id: 2, type: 'counter', col: 1, row: 3, rot: 0 },
+    { id: 3, type: 'table', col: 6, row: 4, rot: 0 },
+    { id: 4, type: 'chair', col: 5, row: 4, rot: 0 },
+    { id: 5, type: 'chair', col: 7, row: 4, rot: 2 }
+  ],
+  nextFurnitureId: 6
 };
 
 // 更新狀態，並通知介面重新顯示
