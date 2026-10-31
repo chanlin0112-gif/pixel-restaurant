@@ -82,7 +82,7 @@
 .hud-btn:disabled { opacity: 0.45; }
 .hud-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--brown); }
 
-/.hud-panel {
+.hud-panel {
   pointer-events: auto; position: absolute; inset: 0; box-sizing: border-box;
   background: rgba(40, 28, 20, 0.45); padding: 16px;
   display: flex; align-items: center; justify-content: center;
