@@ -1,6 +1,10 @@
 import { state, updateState, onStateChange } from '../state/gameState.js';
 import { emit } from '../state/events.js';
 import { FURNITURE, SHOP_ORDER } from '../data/furniture.js';
+import {
+  getLastSavedAt, getBackupTime, downloadSave, exportCode,
+  importSave, restoreBackup, resetGame
+} from '../systems/SaveSystem.js';
 
 // 下方功能列
 const TABS = [
@@ -104,15 +108,16 @@ function buildNav() {
 function bindEvents(root) {
   refs.open.addEventListener('click', () => {
     updateState({ isOpen: !state.isOpen });
-    showMessage(state.isOpen ? '開始營業！顧客會在關卡 4 登場' : '已暫停營業');
   });
   root.querySelector('#hud-settings').addEventListener('click', openSettings);
   root.querySelector('#hud-panel-close').addEventListener('click', closePanel);
   refs.panel.addEventListener('click', (e) => {
     if (e.target === refs.panel) closePanel();
   });
-  // 電腦快捷鍵：1～5 切換功能列、Esc 關閉視窗
+  // 電腦快捷鍵：1～5 切換功能列、Esc 關閉視窗（在輸入框打字時不觸發）
   document.addEventListener('keydown', (e) => {
+    const tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     if (e.key === 'Escape') closePanel();
     const n = Number(e.key);
     if (n >= 1 && n <= TABS.length) selectTab(TABS[n - 1]);
@@ -161,7 +166,6 @@ function openShop() {
     });
   });
 }
-
 function openPanel(title, html) {
   refs.panelTitle.textContent = title;
   refs.panelBody.innerHTML = html;
@@ -173,11 +177,81 @@ function closePanel() {
   setActive('restaurant');
 }
 
+function formatTime(t) {
+  return t ? new Date(t).toLocaleString('zh-TW', { hour12: false }) : '尚未存檔';
+}
+
+const BOX = 'width:100%; box-sizing:border-box; font-size:12px; -webkit-user-select:text; user-select:text;';
+
 function openSettings() {
+  const backupTime = getBackupTime();
   openPanel('⚙️ 設定', `
+    <p><b>💾 存檔</b><br>自動存檔：開啟<br>上次存檔：${formatTime(getLastSavedAt())}</p>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+      <button class="hud-btn primary" style="flex:1 1 45%" data-act="download">下載存檔檔案</button>
+      <button class="hud-btn primary" style="flex:1 1 45%" data-act="copy">複製存檔代碼</button>
+      <button class="hud-btn" style="flex:1 1 45%" data-act="import">匯入存檔</button>
+      <button class="hud-btn" style="flex:1 1 45%" data-act="restore" ${backupTime ? '' : 'disabled'}>還原備份</button>
+      <button class="hud-btn danger" style="flex:1 1 100%" data-act="reset">重新開始遊戲</button>
+    </div>
+    <p style="font-size:13px; opacity:0.7">${backupTime ? `備份時間：${formatTime(backupTime)}` : '目前沒有備份。匯入或重新開始前，會自動備份目前進度。'}</p>
     <p><b>手機操作</b><br>單指拖曳：移動畫面<br>雙指縮放：放大／縮小<br>點家具：旋轉、移動、拆除<br>長按家具：直接拖曳移動</p>
     <p><b>電腦操作</b><br>滑鼠拖曳：移動畫面<br>滾輪：放大／縮小<br>WASD／方向鍵：移動畫面<br>R：旋轉　Enter：確定　Delete：拆除<br>數字鍵 1～5：切換功能列　Esc：取消</p>
-    <p style="opacity:0.6">遊戲版本 0.3.0</p>`);
+    <p style="opacity:0.6">遊戲版本 0.5.0</p>`);
+  const q = (a) => refs.panelBody.querySelector(`[data-act="${a}"]`);
+  q('download').addEventListener('click', () => {
+    downloadSave();
+    showMessage('已下載存檔檔案');
+  });
+  q('copy').addEventListener('click', copyCode);
+  q('import').addEventListener('click', openImport);
+  q('restore').addEventListener('click', () => {
+    if (!confirm('要還原到備份的進度嗎？目前進度會變成新的備份。')) return;
+    if (restoreBackup()) location.reload();
+    else showMessage('備份無法讀取');
+  });
+  q('reset').addEventListener('click', () => {
+    if (!confirm('確定要重新開始嗎？目前進度會先備份，之後可以用「還原備份」找回。')) return;
+    resetGame();
+    location.reload();
+  });
+}
+
+function copyCode() {
+  const code = exportCode();
+  const showBox = () => openPanel('📋 存檔代碼', `
+    <p>請長按下方文字，全選後複製，貼到備忘錄保存：</p>
+    <textarea readonly style="${BOX} height:140px;">${code}</textarea>`);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(code)
+      .then(() => showMessage('已複製存檔代碼，可以貼到備忘錄保存', 3500))
+      .catch(showBox);
+  } else {
+    showBox();
+  }
+}
+
+function openImport() {
+  openPanel('📥 匯入存檔', `
+    <p>選擇之前下載的存檔檔案，或貼上存檔代碼。匯入前會自動備份目前進度。</p>
+    <input type="file" accept=".json,application/json" data-act="file" style="margin-bottom:10px; max-width:100%;">
+    <textarea data-act="text" placeholder="或在這裡貼上存檔代碼" style="${BOX} height:120px;"></textarea>
+    <button class="hud-btn primary" data-act="go" style="width:100%; margin-top:10px;">確定匯入</button>`);
+  const body = refs.panelBody;
+  const textEl = body.querySelector('[data-act="text"]');
+  body.querySelector('[data-act="file"]').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (file) textEl.value = await file.text();
+  });
+  body.querySelector('[data-act="go"]').addEventListener('click', () => {
+    if (!textEl.value.trim()) {
+      showMessage('請先選擇檔案或貼上代碼');
+      return;
+    }
+    if (!confirm('匯入後會取代目前進度（目前進度會先備份），確定嗎？')) return;
+    if (importSave(textEl.value)) location.reload();
+    else showMessage('存檔內容有誤，無法匯入', 3500);
+  });
 }
 
 function render(s) {
